@@ -71,36 +71,75 @@ interface ShieldedTxCount {
 }
 
 async function getBlockchainData() {
-  const response = await fetch(
-    "https://api.blockchair.com/zcash/stats?key=A___8A4ebOe3KJT9bqiiOHWnJbCLpDUZ"
-  );
-  const data = await response.json();
-
-  return data.data as BlockchainInfo;
+  try {
+    const response = await fetch(
+      "https://api.blockchair.com/zcash/stats?key=A___8A4ebOe3KJT9bqiiOHWnJbCLpDUZ"
+    );
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+    const data = await response.json();
+    return data.data as BlockchainInfo;
+  } catch (error) {
+    console.error("Failed to fetch blockchain data:", error);
+    return null;
+  }
 }
 
 async function getBlockchainInfo() {
-  const response = await fetch(blockchainInfoUrl);
-  const data = await response.json();
-  return data.chainSupply.chainValue;
+  try {
+    const response = await fetch(blockchainInfoUrl);
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+    const data = await response.json();
+    return data.chainSupply.chainValue;
+  } catch (error) {
+    console.error("Failed to fetch blockchain info:", error);
+    return null;
+  }
 }
 
 async function getSupplyData(url: string): Promise<SupplyData[]> {
-  const response = await fetch(url);
-  const data = await response.json();
-  return data as SupplyData[];
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+    const data = await response.json();
+    return data as SupplyData[];
+  } catch (error) {
+    console.error(`Failed to fetch supply data from ${url}:`, error);
+    return [];
+  }
 }
 
-async function getLastUpdatedDate(): Promise<string> {
-  const response = await fetch(apiUrl);
-  const data = await response.json();
-  return data[0].commit.committer.date;
+async function getLastUpdatedDate(): Promise<string | null> {
+  try {
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+    const data = await response.json();
+    return data[0].commit.committer.date;
+  } catch (error) {
+    console.error("Failed to fetch last updated date:", error);
+    return null;
+  }
 }
 
-async function getShieldedTxCount(): Promise<ShieldedTxCount> {
-  const response = await fetch(shieldedTxCountUrl);
-  const data = await response.json();
-  return data as ShieldedTxCount;
+async function getShieldedTxCount(): Promise<ShieldedTxCount | null> {
+  try {
+    const response = await fetch(shieldedTxCountUrl);
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+    const data = await response.json();
+    return data as ShieldedTxCount;
+  } catch (error) {
+    console.error("Failed to fetch shielded transaction count:", error);
+    return null;
+  }
 }
 
 const ShieldedPoolDashboard = () => {
@@ -113,20 +152,23 @@ const ShieldedPoolDashboard = () => {
   const [saplingSupply, setSaplingSupply] = useState<SupplyData | null>(null);
   const [orchardSupply, setOrchardSupply] = useState<SupplyData | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [shieldedTxCount, setShieldedTxCount] = useState<ShieldedTxCount | null>(
-    null
-  );
+  const [shieldedTxCount, setShieldedTxCount] =
+    useState<ShieldedTxCount | null>(null);
 
   const { divChartRef, handleSaveToPng } = useExportDashboardAsPNG();
 
   useEffect(() => {
     getBlockchainData().then((data) => {
-      data.nodes = 125; // Manually set the node count to 125
-      setBlockchainInfo(data);
+      if (data) {
+        data.nodes = 125; // Manually set the node count to 125
+        setBlockchainInfo(data);
+      }
     });
     getBlockchainInfo().then((data) => setCirculation(data));
 
-    getLastUpdatedDate().then((date) => setLastUpdated(date.split("T")[0]));
+    getLastUpdatedDate().then((date) =>
+      date ? setLastUpdated(date.split("T")[0]) : null
+    );
 
     getSupplyData(sproutUrl).then((data) =>
       setSproutSupply(data[data.length - 1])
@@ -146,7 +188,9 @@ const ShieldedPoolDashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       const data = await getSupplyData(getDataUrl());
-      setLastUpdated(data[data.length - 1].timestamp.split("T")[0]);
+      if (data.length > 0) {
+        setLastUpdated(data[data.length - 1].timestamp?.split("T")[0]);
+      }
     };
     fetchData();
   }, [selectedPool]);
@@ -223,112 +267,63 @@ const ShieldedPoolDashboard = () => {
           />
         </div>
       </div>
-      <div className="mt-8 flex flex-col items-center">
-        <div className="flex justify-center space-x-4">
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={() => setSelectedPool("default")}
-              text="Total Shielded"
-              className={`rounded-[0.4rem] py-2 px-4 text-white ${
-                selectedPool === "default" ? "bg-[#1984c7]" : "bg-gray-400"
-              }`}
-            />
-            <span className="text-sm text-gray-600">
-              {getTotalShieldedSupply().toLocaleString()} ZEC
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={() => setSelectedPool("hashrate")}
-              text="Hash Rate"
-              className={`rounded-[0.4rem] py-2 px-4 text-white ${
-                selectedPool === "hashrate" ? "bg-[#1984c7]" : "bg-gray-400"
-              }`}
-            />
-          </div>
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={() => setSelectedPool("sprout")}
-              text="Sprout Pool"
-              className={`rounded-[0.4rem] py-2 px-4 text-white ${
-                selectedPool === "sprout" ? "bg-[#1984c7]" : "bg-gray-400"
-              }`}
-            />
-            <span className="text-sm text-gray-600">
-              {sproutSupply
-                ? `${sproutSupply.supply.toLocaleString()} ZEC`
-                : "Loading..."}
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={() => setSelectedPool("sapling")}
-              text="Sapling Pool"
-              className={`rounded-[0.4rem] py-2 px-4 text-white ${
-                selectedPool === "sapling" ? "bg-[#1984c7]" : "bg-gray-400"
-              }`}
-            />
-            <span className="text-sm text-gray-600">
-              {saplingSupply
-                ? `${saplingSupply.supply.toLocaleString()} ZEC`
-                : "Loading..."}
-            </span>
-          </div>
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={() => setSelectedPool("orchard")}
-              text="Orchard Pool"
-              className={`rounded-[0.4rem] py-2 px-4 text-white ${
-                selectedPool === "orchard" ? "bg-[#1984c7]" : "bg-gray-400"
-              }`}
-            />
-            <span className="text-sm text-gray-600">
-              {orchardSupply
-                ? `${orchardSupply.supply.toLocaleString()} ZEC`
-                : "Loading..."}
-            </span>
-          </div>
-        </div>
+      <h2 className="font-bold mt-8 mb-4">Shielded ZEC Supply</h2>
+      <div className="flex flex-col space-y-4 text-sm">
+        <p>
+          The total ZEC supply in Sprout, Sapling, and Orchard shielded pools
+          combined is{" "}
+          <span className="font-semibold">{getTotalShieldedSupply()}</span> ZEC.
+        </p>
+        <p>
+          The circulating supply of ZEC is{" "}
+          <span className="font-semibold">{circulation ?? "Loading..."}</span>{" "}
+          ZEC.
+        </p>
       </div>
-      <HalvingMeter />
-      <div className="flex flex-wrap gap-8 justify-center items-center mt-8">
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">Market Cap</h3>
-          <p>${blockchainInfo.market_cap_usd.toLocaleString()}</p>
+      <h2 className="font-bold mt-8 mb-4">ZEC Metrics</h2>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="border p-4 rounded-lg">
+          <h3 className="font-bold">Market Price (USD)</h3>
+          <p className="text-sm">
+            ${blockchainInfo?.market_price_usd.toFixed(2) ?? "Loading..."}
+          </p>
         </div>
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">ZEC in Circulation</h3>
-          <p>{circulation?.toLocaleString() ?? "Loading..."} ZEC</p>
+        <div className="border p-4 rounded-lg">
+          <h3 className="font-bold">Market Cap (USD)</h3>
+          <p className="text-sm">
+            ${blockchainInfo?.market_cap_usd.toLocaleString() ?? "Loading..."}
+          </p>
         </div>
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">Market Price (USD)</h3>
-          <p>${blockchainInfo.market_price_usd.toFixed(2)}</p>
+        <div className="border p-4 rounded-lg">
+          <h3 className="font-bold">24h Volume (USD)</h3>
+          <p className="text-sm">
+            ${blockchainInfo?.volume_24h.toLocaleString() ?? "Loading..."}
+          </p>
         </div>
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">Market Price (BTC)</h3>
-          <p>{blockchainInfo.market_price_btc}</p>
-        </div>
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">Blocks</h3>
-          <p>{blockchainInfo.blocks.toLocaleString()}</p>
-        </div>
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">24h Transactions</h3>
-          <p>{blockchainInfo.transactions_24h.toLocaleString()}</p>
-        </div>
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">Nodes</h3>
-          <p>{blockchainInfo.nodes}</p> {/* Node count is now manually set to 125 */}
-        </div>
-        <div className="border p-4 rounded-md text-center">
-          <h3 className="font-bold text-lg">Shielded TX (24h)</h3>
-          <p>
-            {shieldedTxCount
-              ? `Sapling: ${shieldedTxCount.sapling_outputs.toLocaleString()} | Orchard: ${shieldedTxCount.orchard_outputs.toLocaleString()}`
-              : "Loading..."}
+        <div className="border p-4 rounded-lg">
+          <h3 className="font-bold">Hashrate (24h Avg)</h3>
+          <p className="text-sm">
+            {blockchainInfo?.hashrate_24h ?? "Loading..."} H/s
           </p>
         </div>
       </div>
+      <h2 className="font-bold mt-8 mb-4">Shielded Transactions</h2>
+      <div className="flex flex-col space-y-4 text-sm">
+        <p>
+          Sapling outputs:{" "}
+          <span className="font-semibold">
+            {shieldedTxCount?.sapling_outputs ?? "Loading..."}
+          </span>
+        </p>
+        <p>
+          Orchard outputs:{" "}
+          <span className="font-semibold">
+            {shieldedTxCount?.orchard_outputs ?? "Loading..."}
+          </span>
+        </p>
+      </div>
+      <h2 className="font-bold mt-8 mb-4">Halving Progress</h2>
+      <HalvingMeter blockchainInfo={blockchainInfo} />
     </div>
   );
 };
